@@ -27,35 +27,31 @@ description:
        https://cloud.google.com/compute/docs/metadata.
        The module must be called from within the GCE instance itself.
        Module based on the code written by Silviu Dicu <silviudicu@gmail.com>.
-notes:
-    - Module is in alpha stage, facts format *will* be changed without prior notification.
 author: "Vasiliy Kaygorodov <vkaygorodov@gmail.com>"
 '''
 
 EXAMPLES = '''
-# Conditional example
+# To see the list of all the facts use command below:
+
+$ ansible -m gce_facts all
+
+# Conditional playbook example
 - name: Gather instance GCE facts
   action: gce_facts
 
 - name: Conditional
   action: debug msg="This instance is scheduled to restart automatically"
-  when: ansible_gce_scheduling_automatic_restart == "TRUE"
+  when: ansible_gce.instance.scheduling.automaticRestart == "TRUE"
 '''
-
-import socket
-import re
-
-socket.setdefaulttimeout(5)
 
 class GceMetadata(object):
 
-    gce_metadata_uri = 'http://metadata.google.internal/computeMetadata/v1/instance/'
+    gce_metadata_uri = 'http://metadata.google.internal/computeMetadata/v1/?recursive=True'
 
     def __init__(self, module, gce_metadata_uri=None):
         self.module   = module
         self.uri_meta = gce_metadata_uri or self.gce_metadata_uri
-        self._data     = {}
-        self._prefix   = 'ansible_gce_%s'
+        self._data     = { 'ansible_gce': {} }
 
     def _fetch(self, url):
         (response, info) = fetch_url(self.module, url, headers={ "Metadata-Flavor": "Google" }, force=True)
@@ -63,48 +59,30 @@ class GceMetadata(object):
             data = response.read()
         else:
             data = None
+        self._data['ansible_gce'] = self.module.from_json(data)
+
+    def _mangle_data(self, data):
+        """
+        Perform some keys conversion to make things look prettier.
+        Example: "projects/11111111111/zones/us-central1-b" becomes "us-central1-b"
+        Also process project sshKeys string and convert it to a list.
+        """
+        machine_type = data['ansible_gce']['instance']['machineType'].split('/')[3]
+        zone = data['ansible_gce']['instance']['zone'].split('/')[3]
+        data['ansible_gce']['instance']['machineType'] = machine_type
+        data['ansible_gce']['instance']['zone'] = zone
+        for interface in data['ansible_gce']['instance']['networkInterfaces']:
+            network = interface['network'].split('/')[3]
+            interface['network'] = network
+        ssh_keys = data['ansible_gce']['project']['attributes']['sshKeys']
+        data['ansible_gce']['project']['attributes']['sshKeys'] = []
+        for ssh_key in ssh_keys.split('\n'):
+            data['ansible_gce']['project']['attributes']['sshKeys'].append(ssh_key)
         return data
 
-    def _mangle_fields(self, fields, uri):
-        new_fields = {}
-        for key, value in fields.iteritems():
-            split_fields = key[len(uri):].split('/')
-            if len(split_fields) > 1 and split_fields[1]:
-                new_key = "-".join(split_fields)
-                new_fields[self._prefix % new_key] = value
-            else:
-                new_key = "".join(split_fields)
-                new_fields[self._prefix % new_key] = value
-        return new_fields
-
-    def fetch(self, uri, recurse=True):
-        raw_subfields = self._fetch(uri)
-        if not raw_subfields:
-            return
-        subfields = raw_subfields.split('\n')
-        for field in subfields:
-            if field.endswith('/') and recurse:
-                self.fetch(uri + field)
-            if uri.endswith('/'):
-                new_uri = uri + field
-            else:
-                new_uri = uri + '/' + field
-            if new_uri not in self._data and not new_uri.endswith('/'):
-                content = self._fetch(new_uri)
-                self._data['%s' % (new_uri)] = content
-
-    def fix_invalid_varnames(self, data):
-        """Change ':'' and '-' to '_' to ensure valid template variable names"""
-        for (key, value) in data.items():
-            if ':' in key or '-' in key:
-                newkey = key.replace(':','_').replace('-','_')
-                del data[key]
-                data[newkey] = value
-
     def run(self):
-        self.fetch(self.uri_meta) # populate _data
-        data = self._mangle_fields(self._data, self.uri_meta)
-        self.fix_invalid_varnames(data)
+        self._fetch(self.uri_meta) # populate _data
+        data = self._mangle_data(self._data)
         return data
 
 def main():

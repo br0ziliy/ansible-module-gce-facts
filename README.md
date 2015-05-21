@@ -1,21 +1,17 @@
 # ansible-module-gce-facts
-Ansible module to gather Google Cloud instance metadata and return it as facts
+Ansible module to gather [Google Cloud instance metadata](https://cloud.google.com/compute/docs/metadata) and return it as facts.
+Until this module accepted by Ansible upstream, read on for usage instructions.
 
-This is an alpha-version of the module. Known issues:
+# Installation and usage
 
-- facts variable names are pretty ugly at this moment:
-
-```json
-{
-"ansible_gce_network_interfaces_0_access_configs_0_external_ip": "100.200.255.255",
-"ansible_gce_network_interfaces_0_access_configs_0_type": "ONE_TO_ONE_NAT",
-"ansible_gce_network_interfaces_0_ip": "10.240.2.255",
-}
+Clone this repository somewhere (`/full/path/to/ansible-module-gce-facts` in the examples below), and run Ansible with `--modules-dir` parameter:
+```
+# git clone https://github.com/br0ziliy/ansible-module-gce-facts.git /full/path/to/ansible-module-gce-facts
+# ansible --modules-dir=/full/path/to/ansible-module-gce-facts -m gce_facts all
+# ansible-playbook --modules-dir=/full/path/to/ansible-module-gce-facts playbook.yml
 ```
 
-- values are not sanitized, example:
+Alternatively you can export `ANSIBLE_LIBRARY` environment variable and run Ansible as usual:
 ```
-"ansible_gce_zone": "projects/111111111111/zones/us-central1-b"
+# export ANSIBLE_LIBRARY=${ANSIBLE_LIBRARY}:/full/path/to/ansible-module-gce-facts
 ```
-
-Let me know if this module might be useful for you so I have some motivation to make it smarter (I will do it eventually anyway, but it might be not very fast :) )
