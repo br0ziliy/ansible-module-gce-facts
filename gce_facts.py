@@ -74,9 +74,12 @@ class GceMetadata(object):
         for interface in data['ansible_gce']['instance']['networkInterfaces']:
             network = interface['network'].split('/')[3]
             interface['network'] = network
-        ssh_keys = data['ansible_gce']['project']['attributes']['sshKeys']
+        ssh_keys_as_str = None
+        for key in ['project', 'instance']:
+            ssh_keys_as_str = \
+            data['ansible_gce'][key]['attributes'].get('sshKeys', default = '')
         data['ansible_gce']['project']['attributes']['sshKeys'] = []
-        for ssh_key in ssh_keys.split('\n'):
+        for ssh_key in ssh_keys_as_str.split('\n'):
             data['ansible_gce']['project']['attributes']['sshKeys'].append(ssh_key)
         return data
 
