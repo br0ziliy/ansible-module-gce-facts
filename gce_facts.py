@@ -77,7 +77,7 @@ class GceMetadata(object):
         ssh_keys_as_str = None
         for key in ['project', 'instance']:
             ssh_keys_as_str = \
-            data['ansible_gce'][key]['attributes'].get('sshKeys', default = '')
+            data['ansible_gce'][key]['attributes'].get('sshKeys', '')
         data['ansible_gce']['project']['attributes']['sshKeys'] = []
         for ssh_key in ssh_keys_as_str.split('\n'):
             data['ansible_gce']['project']['attributes']['sshKeys'].append(ssh_key)
